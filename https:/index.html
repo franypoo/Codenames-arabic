@@ -1,1 +1,618 @@
+// CodeLinks - الجزء الأول من JavaScript
+// متغيرات عامة
+let currentGame = null;
+let currentPage = 'home-page';
+let gameState = {
+    phase: 'waiting',
+    currentTeam: 'red',
+    spymaster: null,
+    wordGrid: [],
+    gameHistory: []
+};
+
+// بيانات اللعبة
+const gameData = {
+    words: [
+        'كتاب', 'فيل', 'نهر', 'جبل', 'نجمة', 'حفل', 'قمر', 'ورد', 'باب', 'حديقة',
+        'طائرة', 'موسيقى', 'لحم', 'مطبخ', 'خروف', 'عسل', 'سلم', 'ورق', 'مطر', 'صندوق',
+        'صوفا', 'قميص', 'رقم', 'كبير', 'سعيد', 'سريع', 'جديد', 'قديم', 'ساخن', 'بارد',
+        'مكتبة', 'فناء', 'سيارة', 'كمبيوتر', 'هاتف', 'مدرسة', 'مستشفى', 'بنك', 'مسجد', 'كتاب',
+        'جرس', 'جسر', 'مصعد', 'سيف', 'جدي', 'موزة', 'تفاحة', 'فراولة', 'موز', 'خرسانة',
+        'كيميا', 'فيزياء', 'طب', 'هندسة', 'تاريخ', 'جغرافيا', 'أدب', 'فن', 'موسيقى', 'نحت',
+        'رياضة', 'كرة', 'تنس', 'سباحة', 'جري', 'جمباز', 'ملاكمة', 'هوكي', 'غولف', 'تايكوندو',
+        'دول', 'مدن', 'جبل', 'صحراء', 'غابة', 'بحر', 'جزيرة', 'ودية', 'نورا', 'ثقافة',
+        'زمن', 'سماء', 'نجوم', 'كوكبة', 'مجرة', 'شمس', 'زحل', 'عطارد', 'المريخ', 'أورانوس',
+        'احتفال', 'عيد', 'حفل', 'زفاف', 'مولد', 'موكب', 'عيد', 'رمضان', 'شهر', 'صفر',
+        'لعبة', 'كرة', 'دمية', 'كتاب', 'قلم', 'مدرسة', 'أصدقاء', 'حديقة', 'حيوانات', 'لحم',
+        'سعيد', 'حزين', 'أخضر', 'أحمر', 'أزرق', 'كبير', 'صغير', 'بطيء', 'قوي', 'ناعم'
+    ],
+    
+    teamSizes: {
+        classic: { red: 9, blue: 8, bystander: 7, assassin: 1 },
+        quick: { red: 4, blue: 4, bystander: 3, assassin: 1 },
+        tournament: { red: 6, blue: 6, bystander: 4, assassin: 1 }
+    },
+    
+    gameModes: {
+        classic: {
+            name: 'اللعب الكلاسيكي',
+            description: 'اللعبة التقليدية مع شبكة 5×5 من الكلمات',
+            minPlayers: 2,
+            maxPlayers: 8,
+            timeLimit: 30
+        },
+        quick: {
+            name: 'اللعب السريع',
+            description: '3 جولات في 15 دقيقة للعبة مكثفة',
+            minPlayers: 2,
+            maxPlayers: 6,
+            timeLimit: 10
+        },
+        ai: {
+            name: 'ضد الذكاء الاصطناعي',
+            description: 'اختبر مهاراتك ضد ماستر ذكي',
+            minPlayers: 1,
+            maxPlayers: 2,
+            timeLimit: 20
+        },
+        tournament: {
+            name: 'البطولة',
+            description: 'تحديات متدرجة مع جوائز خاصة',
+            minPlayers: 4,
+            maxPlayers: 12,
+            timeLimit: 25
+        }
+    }
+};
+
+// أسلوب اللاعب
+let playerStats = {
+    totalGames: 0,
+    wins: 0,
+    losses: 0,
+    winRate: 0,
+    averageTime: '0:00',
+    bestClueRating: 0,
+    specialization: 'مبتدئ',
+    achievements: [],
+    score: 0,
+    level: 'مبتدئ',
+    levelProgress: 0,
+    nextLevelScore: 100
+};
+
+// تهيئة التطبيق
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('CodeLinks Game Initialized');
+    
+    setTimeout(() => {
+        hideLoadingScreen();
+    }, 2000);
+    
+    setupEventListeners();
+    updatePlayerStats();
+    showPage('home-page');
+});
+
+function hideLoadingScreen() {
+    const loadingScreen = document.getElementById('loading-screen');
+    const mainScreen = document.getElementById('main-screen');
+    
+    if (loadingScreen) {
+        loadingScreen.style.opacity = '0';
+        setTimeout(() => {
+            loadingScreen.style.display = 'none';
+            if (mainScreen) {
+                mainScreen.classList.remove('hidden');
+            }
+        }, 500);
+    }
+}
+// CodeLinks - الجزء الثاني من JavaScript
+// إعداد مستمعي الأحداث
+function setupEventListeners() {
+    // أزرار التنقل
+    const homeBtn = document.getElementById('home-btn');
+    const statsBtn = document.getElementById('stats-btn');
+    const friendsBtn = document.getElementById('friends-btn');
+    
+    if (homeBtn) homeBtn.addEventListener('click', () => showPage('home-page'));
+    if (statsBtn) statsBtn.addEventListener('click', () => showPage('stats-page'));
+    if (friendsBtn) friendsBtn.addEventListener('click', () => showPage('friends-page'));
+    
+    // أزرار بدء اللعبة
+    const classicBtn = document.getElementById('classic-mode');
+    const quickBtn = document.getElementById('quick-mode');
+    const aiBtn = document.getElementById('ai-mode');
+    const tournamentBtn = document.getElementById('tournament-mode');
+    
+    if (classicBtn) classicBtn.addEventListener('click', () => startGame('classic'));
+    if (quickBtn) quickBtn.addEventListener('click', () => startGame('quick'));
+    if (aiBtn) aiBtn.addEventListener('click', () => startGame('ai'));
+    if (tournamentBtn) tournamentBtn.addEventListener('click', () => startGame('tournament'));
+    
+    // أزرار التحكم في اللعبة
+    const resetBtn = document.getElementById('reset-game');
+    const revealAllBtn = document.getElementById('reveal-all');
+    const giveHintBtn = document.getElementById('give-hint');
+    
+    if (resetBtn) resetBtn.addEventListener('click', resetGame);
+    if (revealAllBtn) revealAllBtn.addEventListener('click', revealAllWords);
+    if (giveHintBtn) giveHintBtn.addEventListener('click', giveHint);
+}
+
+// إدارة الصفحات
+function showPage(pageId) {
+    // إخفاء جميع الصفحات
+    const pages = document.querySelectorAll('.page');
+    pages.forEach(page => {
+        page.classList.remove('active');
+    });
+    
+    // إظهار الصفحة المطلوبة
+    const targetPage = document.getElementById(pageId);
+    if (targetPage) {
+        targetPage.classList.add('active');
+        currentPage = pageId;
+    }
+    
+    // تحديث التنقل
+    updateNavigation(pageId);
+}
+
+function updateNavigation(activePage) {
+    const navButtons = document.querySelectorAll('.nav-btn');
+    navButtons.forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.getAttribute('href') === '#' + activePage) {
+            btn.classList.add('active');
+        }
+    });
+}
+
+// إدارة اللعبة
+function startGame(mode) {
+    console.log('Starting game mode:', mode);
+    
+    const modeData = gameData.gameModes[mode];
+    if (!modeData) {
+        console.error('Invalid game mode:', mode);
+        return;
+    }
+    
+    // إنشاء لعبة جديدة
+    currentGame = {
+        mode: mode,
+        teamSizes: gameData.teamSizes[mode] || gameData.teamSizes.classic,
+        startTime: Date.now(),
+        isActive: true
+    };
+    
+    // إنشاء شبكة الكلمات
+    generateWordGrid();
+    
+    // إظهار صفحة اللعبة
+    showPage('game-page');
+    
+    // تحديث واجهة اللعبة
+    updateGameInterface();
+    
+    console.log('Game started successfully');
+}
+
+function generateWordGrid() {
+    const teamSizes = currentGame ? currentGame.teamSizes : gameData.teamSizes.classic;
+    const totalWords = teamSizes.red + teamSizes.blue + teamSizes.bystander + teamSizes.assassin;
+    
+    if (totalWords > gameData.words.length) {
+        console.warn('Not enough words for game, using available words');
+    }
+    
+    // خلط الكلمات
+    const shuffledWords = [...gameData.words].sort(() => Math.random() - 0.5);
+    const selectedWords = shuffledWords.slice(0, totalWords);
+    
+    // إنشاء مصفوفة الشبكة
+    gameState.wordGrid = [];
+    let wordIndex = 0;
+    
+    for (let i = 0; i < 5; i++) {
+        for (let j = 0; j < 5; j++) {
+            if (wordIndex < selectedWords.length) {
+                gameState.wordGrid.push({
+                    word: selectedWords[wordIndex],
+                    type: 'hidden', // 'red', 'blue', 'bystander', 'assassin', 'hidden'
+                    revealed: false,
+                    row: i,
+                    col: j
+                });
+                wordIndex++;
+            }
+        }
+    }
+    
+    // توزيع أنواع الكلمات
+    distributeWordTypes();
+}
+
+function distributeWordTypes() {
+    const teamSizes = currentGame ? currentGame.teamSizes : gameData.teamSizes.classic;
+    const totalWords = gameState.wordGrid.length;
+    
+    // إنشاء قائمة بالفهارس
+    const indices = Array.from({length: totalWords}, (_, i) => i);
+    // خلط الفهارس
+    indices.sort(() => Math.random() - 0.5);
+    
+    // توزيع الأنواع
+    let typeIndex = 0;
+    
+    // الفريق الأحمر
+    for (let i = 0; i < teamSizes.red; i++) {
+        if (typeIndex < indices.length) {
+            gameState.wordGrid[indices[typeIndex]].type = 'red';
+            typeIndex++;
+        }
+    }
+    
+    // الفريق الأزرق
+    for (let i = 0; i < teamSizes.blue; i++) {
+        if (typeIndex < indices.length) {
+            gameState.wordGrid[indices[typeIndex]].type = 'blue';
+            typeIndex++;
+        }
+    }
+    
+    // المراقبون
+    for (let i = 0; i < teamSizes.bystander; i++) {
+        if (typeIndex < indices.length) {
+            gameState.wordGrid[indices[typeIndex]].type = 'bystander';
+            typeIndex++;
+        }
+    }
+    
+    // القاتل
+    if (typeIndex < indices.length) {
+        gameState.wordGrid[indices[typeIndex]].type = 'assassin';
+        typeIndex++;
+    }
+}
+// CodeLinks - الجزء الثاني من JavaScript
+// إعداد مستمعي الأحداث
+function setupEventListeners() {
+    // أزرار التنقل
+    const homeBtn = document.getElementById('home-btn');
+    const statsBtn = document.getElementById('stats-btn');
+    const friendsBtn = document.getElementById('friends-btn');
+    
+    if (homeBtn) homeBtn.addEventListener('click', () => showPage('home-page'));
+    if (statsBtn) statsBtn.addEventListener('click', () => showPage('stats-page'));
+    if (friendsBtn) friendsBtn.addEventListener('click', () => showPage('friends-page'));
+    
+    // أزرار بدء اللعبة
+    const classicBtn = document.getElementById('classic-mode');
+    const quickBtn = document.getElementById('quick-mode');
+    const aiBtn = document.getElementById('ai-mode');
+    const tournamentBtn = document.getElementById('tournament-mode');
+    
+    if (classicBtn) classicBtn.addEventListener('click', () => startGame('classic'));
+    if (quickBtn) quickBtn.addEventListener('click', () => startGame('quick'));
+    if (aiBtn) aiBtn.addEventListener('click', () => startGame('ai'));
+    if (tournamentBtn) tournamentBtn.addEventListener('click', () => startGame('tournament'));
+    
+    // أزرار التحكم في اللعبة
+    const resetBtn = document.getElementById('reset-game');
+    const revealAllBtn = document.getElementById('reveal-all');
+    const giveHintBtn = document.getElementById('give-hint');
+    
+    if (resetBtn) resetBtn.addEventListener('click', resetGame);
+    if (revealAllBtn) revealAllBtn.addEventListener('click', revealAllWords);
+    if (giveHintBtn) giveHintBtn.addEventListener('click', giveHint);
+}
+
+// إدارة الصفحات
+function showPage(pageId) {
+    // إخفاء جميع الصفحات
+    const pages = document.querySelectorAll('.page');
+    pages.forEach(page => {
+        page.classList.remove('active');
+    });
+    
+    // إظهار الصفحة المطلوبة
+    const targetPage = document.getElementById(pageId);
+    if (targetPage) {
+        targetPage.classList.add('active');
+        currentPage = pageId;
+    }
+    
+    // تحديث التنقل
+    updateNavigation(pageId);
+}
+
+function updateNavigation(activePage) {
+    const navButtons = document.querySelectorAll('.nav-btn');
+    navButtons.forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.getAttribute('href') === '#' + activePage) {
+            btn.classList.add('active');
+        }
+    });
+}
+
+// إدارة اللعبة
+function startGame(mode) {
+    console.log('Starting game mode:', mode);
+    
+    const modeData = gameData.gameModes[mode];
+    if (!modeData) {
+        console.error('Invalid game mode:', mode);
+        return;
+    }
+    
+    // إنشاء لعبة جديدة
+    currentGame = {
+        mode: mode,
+        teamSizes: gameData.teamSizes[mode] || gameData.teamSizes.classic,
+        startTime: Date.now(),
+        isActive: true
+    };
+    
+    // إنشاء شبكة الكلمات
+    generateWordGrid();
+    
+    // إظهار صفحة اللعبة
+    showPage('game-page');
+    
+    // تحديث واجهة اللعبة
+    updateGameInterface();
+    
+    console.log('Game started successfully');
+}
+
+function generateWordGrid() {
+    const teamSizes = currentGame ? currentGame.teamSizes : gameData.teamSizes.classic;
+    const totalWords = teamSizes.red + teamSizes.blue + teamSizes.bystander + teamSizes.assassin;
+    
+    if (totalWords > gameData.words.length) {
+        console.warn('Not enough words for game, using available words');
+    }
+    
+    // خلط الكلمات
+    const shuffledWords = [...gameData.words].sort(() => Math.random() - 0.5);
+    const selectedWords = shuffledWords.slice(0, totalWords);
+    
+    // إنشاء مصفوفة الشبكة
+    gameState.wordGrid = [];
+    let wordIndex = 0;
+    
+    for (let i = 0; i < 5; i++) {
+        for (let j = 0; j < 5; j++) {
+            if (wordIndex < selectedWords.length) {
+                gameState.wordGrid.push({
+                    word: selectedWords[wordIndex],
+                    type: 'hidden', // 'red', 'blue', 'bystander', 'assassin', 'hidden'
+                    revealed: false,
+                    row: i,
+                    col: j
+                });
+                wordIndex++;
+            }
+        }
+    }
+    
+    // توزيع أنواع الكلمات
+    distributeWordTypes();
+}
+
+function distributeWordTypes() {
+    const teamSizes = currentGame ? currentGame.teamSizes : gameData.teamSizes.classic;
+    const totalWords = gameState.wordGrid.length;
+    
+    // إنشاء قائمة بالفهارس
+    const indices = Array.from({length: totalWords}, (_, i) => i);
+    // خلط الفهارس
+    indices.sort(() => Math.random() - 0.5);
+    
+    // توزيع الأنواع
+    let typeIndex = 0;
+    
+    // الفريق الأحمر
+    for (let i = 0; i < teamSizes.red; i++) {
+        if (typeIndex < indices.length) {
+            gameState.wordGrid[indices[typeIndex]].type = 'red';
+            typeIndex++;
+        }
+    }
+    
+    // الفريق الأزرق
+    for (let i = 0; i < teamSizes.blue; i++) {
+        if (typeIndex < indices.length) {
+            gameState.wordGrid[indices[typeIndex]].type = 'blue';
+            typeIndex++;
+        }
+    }
+    
+    // المراقبون
+    for (let i = 0; i < teamSizes.bystander; i++) {
+        if (typeIndex < indices.length) {
+            gameState.wordGrid[indices[typeIndex]].type = 'bystander';
+            typeIndex++;
+        }
+    }
+    
+    // القاتل
+    if (typeIndex < indices.length) {
+        gameState.wordGrid[indices[typeIndex]].type = 'assassin';
+        typeIndex++;
+    }
+}
+// CodeLinks - الجزء الثاني من JavaScript
+// إعداد مستمعي الأحداث
+function setupEventListeners() {
+    // أزرار التنقل
+    const homeBtn = document.getElementById('home-btn');
+    const statsBtn = document.getElementById('stats-btn');
+    const friendsBtn = document.getElementById('friends-btn');
+    
+    if (homeBtn) homeBtn.addEventListener('click', () => showPage('home-page'));
+    if (statsBtn) statsBtn.addEventListener('click', () => showPage('stats-page'));
+    if (friendsBtn) friendsBtn.addEventListener('click', () => showPage('friends-page'));
+    
+    // أزرار بدء اللعبة
+    const classicBtn = document.getElementById('classic-mode');
+    const quickBtn = document.getElementById('quick-mode');
+    const aiBtn = document.getElementById('ai-mode');
+    const tournamentBtn = document.getElementById('tournament-mode');
+    
+    if (classicBtn) classicBtn.addEventListener('click', () => startGame('classic'));
+    if (quickBtn) quickBtn.addEventListener('click', () => startGame('quick'));
+    if (aiBtn) aiBtn.addEventListener('click', () => startGame('ai'));
+    if (tournamentBtn) tournamentBtn.addEventListener('click', () => startGame('tournament'));
+    
+    // أزرار التحكم في اللعبة
+    const resetBtn = document.getElementById('reset-game');
+    const revealAllBtn = document.getElementById('reveal-all');
+    const giveHintBtn = document.getElementById('give-hint');
+    
+    if (resetBtn) resetBtn.addEventListener('click', resetGame);
+    if (revealAllBtn) revealAllBtn.addEventListener('click', revealAllWords);
+    if (giveHintBtn) giveHintBtn.addEventListener('click', giveHint);
+}
+
+// إدارة الصفحات
+function showPage(pageId) {
+    // إخفاء جميع الصفحات
+    const pages = document.querySelectorAll('.page');
+    pages.forEach(page => {
+        page.classList.remove('active');
+    });
+    
+    // إظهار الصفحة المطلوبة
+    const targetPage = document.getElementById(pageId);
+    if (targetPage) {
+        targetPage.classList.add('active');
+        currentPage = pageId;
+    }
+    
+    // تحديث التنقل
+    updateNavigation(pageId);
+}
+
+function updateNavigation(activePage) {
+    const navButtons = document.querySelectorAll('.nav-btn');
+    navButtons.forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.getAttribute('href') === '#' + activePage) {
+            btn.classList.add('active');
+        }
+    });
+}
+
+// إدارة اللعبة
+function startGame(mode) {
+    console.log('Starting game mode:', mode);
+    
+    const modeData = gameData.gameModes[mode];
+    if (!modeData) {
+        console.error('Invalid game mode:', mode);
+        return;
+    }
+    
+    // إنشاء لعبة جديدة
+    currentGame = {
+        mode: mode,
+        teamSizes: gameData.teamSizes[mode] || gameData.teamSizes.classic,
+        startTime: Date.now(),
+        isActive: true
+    };
+    
+    // إنشاء شبكة الكلمات
+    generateWordGrid();
+    
+    // إظهار صفحة اللعبة
+    showPage('game-page');
+    
+    // تحديث واجهة اللعبة
+    updateGameInterface();
+    
+    console.log('Game started successfully');
+}
+
+function generateWordGrid() {
+    const teamSizes = currentGame ? currentGame.teamSizes : gameData.teamSizes.classic;
+    const totalWords = teamSizes.red + teamSizes.blue + teamSizes.bystander + teamSizes.assassin;
+    
+    if (totalWords > gameData.words.length) {
+        console.warn('Not enough words for game, using available words');
+    }
+    
+    // خلط الكلمات
+    const shuffledWords = [...gameData.words].sort(() => Math.random() - 0.5);
+    const selectedWords = shuffledWords.slice(0, totalWords);
+    
+    // إنشاء مصفوفة الشبكة
+    gameState.wordGrid = [];
+    let wordIndex = 0;
+    
+    for (let i = 0; i < 5; i++) {
+        for (let j = 0; j < 5; j++) {
+            if (wordIndex < selectedWords.length) {
+                gameState.wordGrid.push({
+                    word: selectedWords[wordIndex],
+                    type: 'hidden', // 'red', 'blue', 'bystander', 'assassin', 'hidden'
+                    revealed: false,
+                    row: i,
+                    col: j
+                });
+                wordIndex++;
+            }
+        }
+    }
+    
+    // توزيع أنواع الكلمات
+    distributeWordTypes();
+}
+
+function distributeWordTypes() {
+    const teamSizes = currentGame ? currentGame.teamSizes : gameData.teamSizes.classic;
+    const totalWords = gameState.wordGrid.length;
+    
+    // إنشاء قائمة بالفهارس
+    const indices = Array.from({length: totalWords}, (_, i) => i);
+    // خلط الفهارس
+    indices.sort(() => Math.random() - 0.5);
+    
+    // توزيع الأنواع
+    let typeIndex = 0;
+    
+    // الفريق الأحمر
+    for (let i = 0; i < teamSizes.red; i++) {
+        if (typeIndex < indices.length) {
+            gameState.wordGrid[indices[typeIndex]].type = 'red';
+            typeIndex++;
+        }
+    }
+    
+    // الفريق الأزرق
+    for (let i = 0; i < teamSizes.blue; i++) {
+        if (typeIndex < indices.length) {
+            gameState.wordGrid[indices[typeIndex]].type = 'blue';
+            typeIndex++;
+        }
+    }
+    
+    // المراقبون
+    for (let i = 0; i < teamSizes.bystander; i++) {
+        if (typeIndex < indices.length) {
+            gameState.wordGrid[indices[typeIndex]].type = 'bystander';
+            typeIndex++;
+        }
+    }
+    
+    // القاتل
+    if (typeIndex < indices.length) {
+        gameState.wordGrid[indices[typeIndex]].type = 'assassin';
+        typeIndex++;
+    }
+}
 
